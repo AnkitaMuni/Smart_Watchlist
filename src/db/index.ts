@@ -1,5 +1,12 @@
 import Dexie, { type Table } from 'dexie';
+import { createClient } from '@supabase/supabase-js';
 import type { Watchlist, WatchlistEntry, LastViewedRecord, SymbolSnapshot } from '../types';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase =
+  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export class WatchlistDB extends Dexie {
   watchlists!: Table<Watchlist, string>;
@@ -22,29 +29,85 @@ export const db = new WatchlistDB();
 
 export async function ensureDefaultWatchlist(): Promise<string> {
   const existing = await db.watchlists.toArray();
+
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('watchlists').select('*').limit(1);
+      if (data && data.length > 0) {
+        const sbList = data[0];
+        const id = sbList.id;
+        await db.watchlists.put({ id, name: sbList.name || 'My Watchlist', createdAt: Date.now() });
+        return id;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch error:', err);
+    }
+  }
+
   if (existing.length > 0) return existing[0].id;
 
   const id = crypto.randomUUID();
-  await db.watchlists.add({
-    id,
-    name: 'My Watchlist',
-    createdAt: Date.now(),
-  });
+  const name = 'My Watchlist';
+  const createdAt = Date.now();
+  await db.watchlists.add({ id, name, createdAt });
+
+  if (supabase) {
+    try {
+      await supabase.from('watchlists').insert({ id, name });
+    } catch (err) {
+      console.warn('Supabase insert error:', err);
+    }
+  }
+
   return id;
 }
 
 export async function getAllWatchlists(): Promise<Watchlist[]> {
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('watchlists').select('*');
+      if (data && data.length > 0) {
+        const items: Watchlist[] = data.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          createdAt: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
+        }));
+        for (const item of items) {
+          await db.watchlists.put(item);
+        }
+        return items;
+      }
+    } catch (err) {
+      console.warn('Supabase getAllWatchlists error:', err);
+    }
+  }
   return db.watchlists.orderBy('createdAt').toArray();
 }
 
 export async function createWatchlist(name: string): Promise<string> {
   const id = crypto.randomUUID();
-  await db.watchlists.add({ id, name, createdAt: Date.now() });
+  const createdAt = Date.now();
+  await db.watchlists.add({ id, name, createdAt });
+
+  if (supabase) {
+    try {
+      await supabase.from('watchlists').insert({ id, name });
+    } catch (err) {
+      console.warn('Supabase createWatchlist error:', err);
+    }
+  }
   return id;
 }
 
 export async function renameWatchlist(id: string, name: string): Promise<void> {
   await db.watchlists.update(id, { name });
+  if (supabase) {
+    try {
+      await supabase.from('watchlists').update({ name }).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase renameWatchlist error:', err);
+    }
+  }
 }
 
 export async function deleteWatchlist(id: string): Promise<void> {
@@ -52,9 +115,41 @@ export async function deleteWatchlist(id: string): Promise<void> {
     await db.entries.where('watchlistId').equals(id).delete();
     await db.watchlists.delete(id);
   });
+
+  if (supabase) {
+    try {
+      await supabase.from('watchlist_symbols').delete().eq('watchlist_id', id);
+      await supabase.from('watchlists').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase deleteWatchlist error:', err);
+    }
+  }
 }
 
 export async function getWatchlistEntries(watchlistId: string): Promise<WatchlistEntry[]> {
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('watchlist_symbols')
+        .select('*')
+        .eq('watchlist_id', watchlistId);
+
+      if (data && data.length > 0) {
+        const entries: WatchlistEntry[] = data.map((d: any) => ({
+          id: d.id || crypto.randomUUID(),
+          watchlistId: d.watchlist_id || watchlistId,
+          symbol: d.symbol.toUpperCase(),
+          addedAt: d.added_at ? new Date(d.added_at).getTime() : Date.now(),
+        }));
+        for (const e of entries) {
+          await db.entries.put(e);
+        }
+        return entries;
+      }
+    } catch (err) {
+      console.warn('Supabase getWatchlistEntries error:', err);
+    }
+  }
   return db.entries.where('watchlistId').equals(watchlistId).toArray();
 }
 
@@ -64,14 +159,28 @@ export async function addSymbolToWatchlist(watchlistId: string, symbol: string):
     .where('[watchlistId+symbol]')
     .equals([watchlistId, upper])
     .first();
-  if (existing) return;
 
-  await db.entries.add({
-    id: crypto.randomUUID(),
-    watchlistId,
-    symbol: upper,
-    addedAt: Date.now(),
-  });
+  if (!existing) {
+    const entry: WatchlistEntry = {
+      id: crypto.randomUUID(),
+      watchlistId,
+      symbol: upper,
+      addedAt: Date.now(),
+    };
+    await db.entries.add(entry);
+
+    if (supabase) {
+      try {
+        await supabase.from('watchlist_symbols').insert({
+          id: entry.id,
+          watchlist_id: watchlistId,
+          symbol: upper,
+        });
+      } catch (err) {
+        console.warn('Supabase addSymbolToWatchlist error:', err);
+      }
+    }
+  }
 }
 
 export async function removeSymbolFromWatchlist(watchlistId: string, symbol: string): Promise<void> {
@@ -80,6 +189,18 @@ export async function removeSymbolFromWatchlist(watchlistId: string, symbol: str
     .where('[watchlistId+symbol]')
     .equals([watchlistId, upper])
     .delete();
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('watchlist_symbols')
+        .delete()
+        .eq('watchlist_id', watchlistId)
+        .eq('symbol', upper);
+    } catch (err) {
+      console.warn('Supabase removeSymbolFromWatchlist error:', err);
+    }
+  }
 }
 
 export async function getLastViewed(symbol: string): Promise<LastViewedRecord | null> {
@@ -107,7 +228,7 @@ export async function updateLastViewed(
   week52Low: number,
 ): Promise<void> {
   const upper = symbol.toUpperCase().trim();
-  await db.lastViewed.put({
+  const record: LastViewedRecord = {
     symbol: upper,
     lastViewedAt: Date.now(),
     lastPrice: price,
@@ -115,11 +236,41 @@ export async function updateLastViewed(
     lastChangePercent: changePercent,
     lastWeek52High: week52High,
     lastWeek52Low: week52Low,
-  });
+  };
+  await db.lastViewed.put(record);
+
+  if (supabase) {
+    try {
+      await supabase.from('sessions').upsert({
+        symbol: upper,
+        last_price: price,
+        last_volume: volume,
+        last_change_percent: changePercent,
+        last_viewed_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Supabase updateLastViewed error:', err);
+    }
+  }
 }
 
 export async function saveSnapshot(snapshot: SymbolSnapshot): Promise<void> {
   await db.snapshots.add(snapshot);
+
+  if (supabase) {
+    try {
+      await supabase.from('symbol_snapshots').insert({
+        symbol: snapshot.symbol,
+        price: snapshot.price,
+        volume: snapshot.volume,
+        change_percent: snapshot.changePercent,
+        week52_high: snapshot.week52High,
+        week52_low: snapshot.week52Low,
+      });
+    } catch (err) {
+      console.warn('Supabase saveSnapshot error:', err);
+    }
+  }
 }
 
 export async function getRecentSnapshots(symbol: string, limit: number = 30): Promise<SymbolSnapshot[]> {
