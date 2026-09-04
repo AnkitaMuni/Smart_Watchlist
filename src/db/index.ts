@@ -2,7 +2,15 @@ import Dexie, { type Table } from 'dexie';
 import { createClient } from '@supabase/supabase-js';
 import type { Watchlist, WatchlistEntry, LastViewedRecord, SymbolSnapshot } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+function cleanSupabaseUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  let cleaned = url.trim().replace(/\/+$/, '');
+  cleaned = cleaned.replace(/\/rest\/v1\/?$/, '');
+  return cleaned;
+}
+
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseUrl = cleanSupabaseUrl(rawSupabaseUrl);
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase =
