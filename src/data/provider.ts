@@ -41,11 +41,17 @@ export class BackendMarketDataProvider implements MarketDataProvider {
     for (let i = 30; i >= 0; i--) {
       const time = now - i * 86400;
       const variation = (Math.random() - 0.48) * (basePrice * 0.02);
-      const price = Number((basePrice + variation).toFixed(2));
+      const current = Number((basePrice + variation).toFixed(2));
+
       points.push({
         timestamp: time,
-        price: price,
-      } as PricePoint);
+        price: current,
+        open: Number((current - 1).toFixed(2)),
+        high: Number((current + 2).toFixed(2)),
+        low: Number((current - 2).toFixed(2)),
+        close: current,
+        volume: 1000000 + Math.floor(Math.random() * 500000),
+      } as unknown as PricePoint);
     }
 
     return {
