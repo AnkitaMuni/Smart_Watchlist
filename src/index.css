@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #111729;
+    --bg-tertiary: #1a2236;
+    --border: #1e2a44;
+    --text-primary: #e4e9f2;
+    --text-secondary: #8b95a8;
+    --text-muted: #5a6478;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a3550;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a4560;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-[#1e2a44] bg-[#111729];
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:border-[#337bff]/40 hover:bg-[#1a2236];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-500 active:bg-primary-700;
+  }
+  .btn-secondary {
+    @apply btn border border-[#2a3550] bg-[#1a2236] text-[#e4e9f2] hover:border-[#3a4560] hover:bg-[#22304a];
+  }
+  .btn-ghost {
+    @apply btn text-[#8b95a8] hover:bg-[#1a2236] hover:text-[#e4e9f2];
+  }
+  .input {
+    @apply rounded-lg border border-[#2a3550] bg-[#0a0e1a] px-3 py-2 text-sm text-[#e4e9f2] placeholder-[#5a6478] outline-none transition-colors focus:border-primary-500;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+  .price-up {
+    @apply text-success-400;
+  }
+  .price-down {
+    @apply text-error-400;
+  }
+  .price-neutral {
+    @apply text-[#8b95a8];
+  }
+}
