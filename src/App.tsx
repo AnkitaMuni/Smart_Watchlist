@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Eye, Activity, Cpu, LayoutGrid, Table } from 'lucide-react';
 import { WatchlistSelector } from './ui/WatchlistSelector';
 import { AddSymbol } from './ui/AddSymbol';
+import { MarketPulse } from './ui/MarketPulse';
 import { WhatChanged } from './ui/WhatChanged';
 import { WatchlistTable } from './ui/WatchlistTable';
 import { VolatilityHeatmap } from './ui/VolatilityHeatmap';
@@ -100,6 +101,9 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Global Market Pulse Ticker Overview */}
+        <MarketPulse watchlistId={activeWatchlistId} onSelectSymbol={setSelectedSymbol} />
 
         {/* Watchlist main view (Table or Volatility Heatmap) */}
         {viewMode === 'table' ? (
