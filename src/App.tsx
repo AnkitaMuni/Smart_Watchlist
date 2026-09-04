@@ -39,7 +39,7 @@ export default function App() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-success-500" />
                 </span>
-                <span className="text-xs text-[#8b95a8]">Live demo data</span>
+                <span className="text-xs text-[#8b95a8]">Live Market Data</span>
               </div>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function App() {
             <Activity size={12} />
             <span>Smart Watchlist — Hackathon build</span>
           </div>
-          <div>Mock market data • Updates every 30s • IndexedDB persistence</div>
+          <div>Powered by Finnhub API • Real-time Market Quotes</div>
         </div>
       </footer>
     </div>
