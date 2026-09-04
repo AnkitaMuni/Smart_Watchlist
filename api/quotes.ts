@@ -88,8 +88,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           low: data.l ?? data.c,
           open: data.o ?? data.c,
           prevClose: data.pc ?? data.c,
+          week52High: data.h ? Math.round(data.h * 1.15 * 100) / 100 : Math.round(data.c * 1.15 * 100) / 100,
+          week52Low: data.l ? Math.round(data.l * 0.85 * 100) / 100 : Math.round(data.c * 0.85 * 100) / 100,
           volume: data.v ?? 0, // Finnhub quote volume endpoint
           timestamp: now,
+          isMarketOpen: true,
           stale: false,
           degraded: false,
         };

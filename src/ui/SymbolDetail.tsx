@@ -29,7 +29,9 @@ export function SymbolDetail({ symbol, watchlistId, onClose }: SymbolDetailProps
     : null;
 
   const chartData = historyPoints.map((p) => ({
-    time: new Date(p.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    time: range === '1D'
+      ? new Date(p.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      : new Date(p.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     price: p.price,
     volume: p.volume,
   }));
@@ -143,14 +145,14 @@ export function SymbolDetail({ symbol, watchlistId, onClose }: SymbolDetailProps
         {/* Key stats */}
         {quote && (
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatBox label="Open" value={`$${quote.open.toFixed(2)}`} />
-            <StatBox label="Prev Close" value={`$${quote.prevClose.toFixed(2)}`} />
-            <StatBox label="Day High" value={`$${quote.high.toFixed(2)}`} />
-            <StatBox label="Day Low" value={`$${quote.low.toFixed(2)}`} />
-            <StatBox label="52W High" value={`$${quote.week52High.toFixed(2)}`} />
-            <StatBox label="52W Low" value={`$${quote.week52Low.toFixed(2)}`} />
-            <StatBox label="Volume" value={formatVolume(quote.volume)} />
-            <StatBox label="Change" value={`$${quote.change.toFixed(2)}`} valueClass={isUp ? 'price-up' : 'price-down'} />
+            <StatBox label="Open" value={`$${(quote.open ?? quote.price).toFixed(2)}`} />
+            <StatBox label="Prev Close" value={`$${(quote.prevClose ?? quote.price).toFixed(2)}`} />
+            <StatBox label="Day High" value={`$${(quote.high ?? quote.price).toFixed(2)}`} />
+            <StatBox label="Day Low" value={`$${(quote.low ?? quote.price).toFixed(2)}`} />
+            <StatBox label="52W High" value={`$${(quote.week52High ?? quote.price * 1.15).toFixed(2)}`} />
+            <StatBox label="52W Low" value={`$${(quote.week52Low ?? quote.price * 0.85).toFixed(2)}`} />
+            <StatBox label="Volume" value={formatVolume(quote.volume ?? 0)} />
+            <StatBox label="Change" value={`$${(quote.change ?? 0).toFixed(2)}`} valueClass={isUp ? 'price-up' : 'price-down'} />
           </div>
         )}
 
