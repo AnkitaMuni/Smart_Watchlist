@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
-import { TrendingUp, TrendingDown, Activity, BarChart3, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { Activity, BarChart3, ArrowUpRight, ArrowDownRight, Filter, Clock } from 'lucide-react';
 import type { ChangeScore } from '../types';
 import { useWhatChanged, useQuotes, useMarkAsSeen, useWatchlistEntries } from '../hooks';
-import { useEffect, useRef } from 'react';
 
 interface WhatChangedProps {
   watchlistId: string | null;
   onSelectSymbol: (symbol: string) => void;
 }
+
+type SensitivityMode = 'all' | 'moderate' | 'high';
+type BaselineMode = 'last-seen' | 'prev-close' | 'day-open';
 
 export function WhatChanged({ watchlistId, onSelectSymbol }: WhatChangedProps) {
   const { data: entries } = useWatchlistEntries(watchlistId);
@@ -17,7 +19,10 @@ export function WhatChanged({ watchlistId, onSelectSymbol }: WhatChangedProps) {
   const markAsSeen = useMarkAsSeen();
   const hasMarked = useRef(false);
 
-  // Auto-mark as seen after a delay so the panel shows changes, then resets on watchlist switch
+  const [sensitivity, setSensitivity] = useState<SensitivityMode>('all');
+  const [baseline, setBaseline] = useState<BaselineMode>('last-seen');
+
+  // Auto-mark as seen after 10 seconds so changes persist until next session
   useEffect(() => {
     hasMarked.current = false;
   }, [watchlistId]);
@@ -35,14 +40,48 @@ export function WhatChanged({ watchlistId, onSelectSymbol }: WhatChangedProps) {
         markAsSeen.mutate(quotes);
         hasMarked.current = true;
       }
-    }, 10000);
+    }, 12000);
 
     return () => clearTimeout(timer);
   }, [scores, quotesMap, markAsSeen]);
 
-  const significantScores = (scores ?? []).filter((s) => s.compositeScore > 0.01);
-  const lastCheckedTime = significantScores.length > 0
-    ? Math.min(...significantScores.map((s) => s.lastSeenAt))
+  // Adjust scores dynamically based on chosen baseline (last-seen vs prev-close vs day-open)
+  const adjustedScores = useMemo(() => {
+    if (!scores) return [];
+    return scores.map((s) => {
+      const quote = quotesMap?.get(s.symbol)?.quote;
+      if (!quote) return s;
+
+      let pct = s.priceChangePercent;
+      let reason = s.topReason;
+
+      if (baseline === 'prev-close' && quote.prevClose > 0) {
+        pct = quote.changePercent;
+        reason = `Move vs prev close: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+      } else if (baseline === 'day-open' && quote.open > 0) {
+        pct = ((quote.price - quote.open) / quote.open) * 100;
+        reason = `Move vs day open: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+      }
+
+      return {
+        ...s,
+        priceChangePercent: pct,
+        topReason: reason,
+      };
+    });
+  }, [scores, quotesMap, baseline]);
+
+  // Filter based on sensitivity selection
+  const filteredScores = useMemo(() => {
+    return adjustedScores.filter((s) => {
+      if (sensitivity === 'high') return Math.abs(s.priceChangePercent) >= 3 || s.compositeScore > 0.4;
+      if (sensitivity === 'moderate') return Math.abs(s.priceChangePercent) >= 1 || s.compositeScore > 0.2;
+      return s.compositeScore > 0.01 || Math.abs(s.priceChangePercent) > 0;
+    });
+  }, [adjustedScores, sensitivity]);
+
+  const lastCheckedTime = filteredScores.length > 0
+    ? Math.min(...filteredScores.map((s) => s.lastSeenAt || Date.now()))
     : null;
 
   if (isLoading) {
@@ -53,55 +92,102 @@ export function WhatChanged({ watchlistId, onSelectSymbol }: WhatChangedProps) {
     );
   }
 
-  if (symbols.length === 0) {
-    return null;
-  }
-
-  if (significantScores.length === 0) {
-    return (
-      <div className="card p-6">
-        <div className="flex items-center gap-2 text-[#8b95a8]">
-          <Activity size={18} className="text-success-400" />
-          <span className="text-sm">
-            Nothing meaningful has changed since you last checked.{' '}
-            {lastCheckedTime && (
-              <span className="text-[#5a6478]">
-                Last checked {timeAgo(lastCheckedTime)}
-              </span>
-            )}
-          </span>
-        </div>
-      </div>
-    );
-  }
+  if (symbols.length === 0) return null;
 
   return (
     <div className="card p-5">
-      <div className="mb-4 flex items-center justify-between">
+      {/* Header with Title & Filter Controls */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500/10">
             <Activity size={16} className="text-primary-400" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-[#e4e9f2]">What Changed Since You Last Checked</h2>
-            {lastCheckedTime && (
+            {lastCheckedTime && lastCheckedTime > 0 && (
               <p className="text-xs text-[#5a6478]">Last checked {timeAgo(lastCheckedTime)}</p>
             )}
           </div>
         </div>
-        <span className="badge bg-primary-500/10 text-primary-400">
-          {significantScores.length} {significantScores.length === 1 ? 'alert' : 'alerts'}
-        </span>
+
+        {/* Sensitivity & Baseline Filters */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Baseline Picker */}
+          <div className="flex items-center rounded-lg border border-[#1e2a44] bg-[#111729] p-1">
+            <Clock size={12} className="ml-1.5 mr-1 text-[#5a6478]" />
+            <button
+              onClick={() => setBaseline('last-seen')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                baseline === 'last-seen' ? 'bg-primary-500/20 text-primary-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              Last Seen
+            </button>
+            <button
+              onClick={() => setBaseline('prev-close')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                baseline === 'prev-close' ? 'bg-primary-500/20 text-primary-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              Prev Close
+            </button>
+            <button
+              onClick={() => setBaseline('day-open')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                baseline === 'day-open' ? 'bg-primary-500/20 text-primary-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              Day Open
+            </button>
+          </div>
+
+          {/* Sensitivity Filter */}
+          <div className="flex items-center rounded-lg border border-[#1e2a44] bg-[#111729] p-1">
+            <Filter size={12} className="ml-1.5 mr-1 text-[#5a6478]" />
+            <button
+              onClick={() => setSensitivity('all')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                sensitivity === 'all' ? 'bg-accent-500/20 text-accent-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              All Moves
+            </button>
+            <button
+              onClick={() => setSensitivity('moderate')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                sensitivity === 'moderate' ? 'bg-accent-500/20 text-accent-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              &gt;1%
+            </button>
+            <button
+              onClick={() => setSensitivity('high')}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                sensitivity === 'high' ? 'bg-accent-500/20 text-accent-400 font-medium' : 'text-[#5a6478]'
+              }`}
+            >
+              &gt;3% High
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        {significantScores.slice(0, 8).map((score, idx) => (
-          <WhatChangedRow key={score.symbol} score={score} rank={idx + 1} onSelect={onSelectSymbol} />
-        ))}
+      {filteredScores.length === 0 ? (
+        <div className="py-4 text-center text-xs text-[#5a6478]">
+          No changes matched the selected filter criteria ({sensitivity.toUpperCase()}).
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredScores.slice(0, 8).map((score, idx) => (
+            <WhatChangedRow key={score.symbol} score={score} rank={idx + 1} onSelect={onSelectSymbol} />
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between text-xs text-[#5a6478]">
+        <span>Showing {filteredScores.length} detected signals</span>
+        <span>Auto-syncs session snapshots</span>
       </div>
-      <p className="mt-3 text-xs text-[#5a6478]">
-        Changes will be marked as seen after 10 seconds. This panel updates automatically.
-      </p>
     </div>
   );
 }

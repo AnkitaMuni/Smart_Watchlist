@@ -124,6 +124,22 @@ export function SymbolDetail({ symbol, watchlistId, onClose }: SymbolDetailProps
                       label={{ value: 'Last seen', fill: '#337bff', fontSize: 10, position: 'insideTopRight' }}
                     />
                   )}
+                  {chartData.length > 0 && (
+                    <>
+                      <ReferenceLine
+                        y={Math.max(...chartData.map((d) => d.price))}
+                        stroke="#34d399"
+                        strokeDasharray="3 3"
+                        label={{ value: 'High', fill: '#34d399', fontSize: 10, position: 'insideTopLeft' }}
+                      />
+                      <ReferenceLine
+                        y={Math.min(...chartData.map((d) => d.price))}
+                        stroke="#f87171"
+                        strokeDasharray="3 3"
+                        label={{ value: 'Low', fill: '#f87171', fontSize: 10, position: 'insideBottomLeft' }}
+                      />
+                    </>
+                  )}
                   <Line
                     type="monotone"
                     dataKey="price"
