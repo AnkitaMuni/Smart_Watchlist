@@ -61,6 +61,7 @@ export async function ensureDefaultWatchlist(): Promise<string> {
 
   if (supabase) {
     try {
+      await supabase.from('sessions').insert({ id: crypto.randomUUID(), created_at: new Date().toISOString() });
       await supabase.from('watchlists').insert({ id, name });
     } catch (err) {
       console.warn('Supabase insert error:', err);
@@ -271,9 +272,7 @@ export async function saveSnapshot(snapshot: SymbolSnapshot): Promise<void> {
         symbol: snapshot.symbol,
         price: snapshot.price,
         volume: snapshot.volume,
-        change_percent: snapshot.changePercent,
-        week52_high: snapshot.week52High,
-        week52_low: snapshot.week52Low,
+        last_viewed_at: new Date(snapshot.timestamp || Date.now()).toISOString(),
       });
     } catch (err) {
       console.warn('Supabase saveSnapshot error:', err);
