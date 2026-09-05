@@ -13,8 +13,8 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/AnkitaMuni/Code-By-Grow.git
-cd Code-By-Grow
+git clone https://github.com/AnkitaMuni/Smart_Watchlist.git
+cd Smart_Watchlist
 
 # 2. Install dependencies
 npm install
