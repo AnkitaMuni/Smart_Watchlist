@@ -60,12 +60,17 @@ export async function initSession(): Promise<string> {
 }
 
 export async function ensureDefaultWatchlist(): Promise<string> {
-  await initSession();
-  const existing = await db.watchlists.toArray();
+  const sessionId = await initSession();
 
   if (supabase) {
     try {
-      const { data } = await supabase.from('watchlists').select('*').limit(1);
+      const { data } = await supabase
+        .from('watchlists')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true })
+        .limit(1);
+
       if (data && data.length > 0) {
         const sbList = data[0];
         const id = sbList.id;
@@ -77,8 +82,11 @@ export async function ensureDefaultWatchlist(): Promise<string> {
     }
   }
 
-  if (existing.length > 0) return existing[0].id;
+  // Check local Dexie DB for this session
+  const existing = await db.watchlists.toArray();
+  if (existing.length > 0 && !supabase) return existing[0].id;
 
+  // Initialize fresh starter watchlist for this unique device/session
   const id = crypto.randomUUID();
   const name = 'My Watchlist';
   const createdAt = Date.now();
@@ -86,9 +94,24 @@ export async function ensureDefaultWatchlist(): Promise<string> {
 
   if (supabase) {
     try {
-      await supabase.from('watchlists').insert({ id, name });
+      await supabase.from('watchlists').insert({
+        id,
+        session_id: sessionId,
+        name,
+      });
+
+      // Add starter stocks for new users
+      const starterSymbols = ['AAPL', 'NVDA', 'MSFT', 'TSLA'];
+      for (const sym of starterSymbols) {
+        await addSymbolToWatchlist(id, sym);
+      }
     } catch (err) {
       console.warn('Supabase insert error:', err);
+    }
+  } else {
+    const starterSymbols = ['AAPL', 'NVDA', 'MSFT', 'TSLA'];
+    for (const sym of starterSymbols) {
+      await addSymbolToWatchlist(id, sym);
     }
   }
 
@@ -96,15 +119,22 @@ export async function ensureDefaultWatchlist(): Promise<string> {
 }
 
 export async function getAllWatchlists(): Promise<Watchlist[]> {
+  const sessionId = getOrCreateSessionId();
   if (supabase) {
     try {
-      const { data } = await supabase.from('watchlists').select('*');
+      const { data } = await supabase
+        .from('watchlists')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
       if (data && data.length > 0) {
         const items: Watchlist[] = data.map((d: any) => ({
           id: d.id,
           name: d.name,
           createdAt: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
         }));
+        await db.watchlists.clear();
         for (const item of items) {
           await db.watchlists.put(item);
         }
@@ -118,13 +148,18 @@ export async function getAllWatchlists(): Promise<Watchlist[]> {
 }
 
 export async function createWatchlist(name: string): Promise<string> {
+  const sessionId = getOrCreateSessionId();
   const id = crypto.randomUUID();
   const createdAt = Date.now();
   await db.watchlists.add({ id, name, createdAt });
 
   if (supabase) {
     try {
-      await supabase.from('watchlists').insert({ id, name });
+      await supabase.from('watchlists').insert({
+        id,
+        session_id: sessionId,
+        name,
+      });
     } catch (err) {
       console.warn('Supabase createWatchlist error:', err);
     }
@@ -174,6 +209,7 @@ export async function getWatchlistEntries(watchlistId: string): Promise<Watchlis
           symbol: d.symbol.toUpperCase(),
           addedAt: d.added_at ? new Date(d.added_at).getTime() : Date.now(),
         }));
+        await db.entries.where('watchlistId').equals(watchlistId).delete();
         for (const e of entries) {
           await db.entries.put(e);
         }
