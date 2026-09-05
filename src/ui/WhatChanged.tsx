@@ -54,30 +54,42 @@ export function WhatChanged({ watchlistId, onSelectSymbol }: WhatChangedProps) {
 
       let pct = s.priceChangePercent;
       let reason = s.topReason;
+      let composite = s.compositeScore;
 
       if (baseline === 'prev-close' && quote.prevClose > 0) {
         pct = quote.changePercent;
         reason = `Move vs prev close: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+        composite = Math.min(1, Math.max(0.1, Math.abs(pct) / 5 + (quote.volume > 2000000 ? 0.2 : 0)));
       } else if (baseline === 'day-open' && quote.open > 0) {
         pct = ((quote.price - quote.open) / quote.open) * 100;
         reason = `Move vs day open: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+        composite = Math.min(1, Math.max(0.1, Math.abs(pct) / 5 + (quote.volume > 2000000 ? 0.2 : 0)));
+      } else if (baseline === 'last-seen') {
+        if (pct === 0 && quote.changePercent !== 0) {
+          pct = quote.changePercent;
+          reason = `Daily move: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+          composite = Math.min(1, Math.max(0.1, Math.abs(pct) / 5 + (quote.volume > 2000000 ? 0.2 : 0)));
+        }
       }
 
       return {
         ...s,
         priceChangePercent: pct,
         topReason: reason,
+        compositeScore: composite || s.compositeScore,
       };
     });
   }, [scores, quotesMap, baseline]);
 
   // Filter based on sensitivity selection
   const filteredScores = useMemo(() => {
-    return adjustedScores.filter((s) => {
-      if (sensitivity === 'high') return Math.abs(s.priceChangePercent) >= 3 || s.compositeScore > 0.4;
-      if (sensitivity === 'moderate') return Math.abs(s.priceChangePercent) >= 1 || s.compositeScore > 0.2;
-      return s.compositeScore > 0.01 || Math.abs(s.priceChangePercent) > 0;
-    });
+    return adjustedScores
+      .filter((s) => {
+        if (sensitivity === 'high') return Math.abs(s.priceChangePercent) >= 3 || s.compositeScore > 0.4;
+        if (sensitivity === 'moderate') return Math.abs(s.priceChangePercent) >= 1 || s.compositeScore > 0.2;
+        return true;
+      })
+      .sort((a, b) => b.compositeScore - a.compositeScore);
   }, [adjustedScores, sensitivity]);
 
   const lastCheckedTime = filteredScores.length > 0
