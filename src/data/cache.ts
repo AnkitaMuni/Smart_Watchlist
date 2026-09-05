@@ -38,14 +38,6 @@ export class QuoteCache {
           stateMessage: this.freshnessMessage(cached.quote.timestamp),
         };
       }
-      if (age < QUOTE_TTL * 4) {
-        // Stale but usable
-        return {
-          quote: cached.quote,
-          state: 'cached',
-          stateMessage: `Cached — ${this.freshnessMessage(cached.quote.timestamp)}`,
-        };
-      }
     }
 
     try {

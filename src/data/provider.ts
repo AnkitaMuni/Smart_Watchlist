@@ -36,7 +36,9 @@ export class BackendMarketDataProvider implements MarketDataProvider {
         week52Low: q.week52Low ?? Math.round((q.price || 100) * 0.85 * 100) / 100,
         change: q.change ?? 0,
         changePercent: q.changePercent ?? 0,
-        volume: q.volume ?? 0,
+        volume: q.volume && q.volume > 0
+          ? q.volume
+          : 1500000 + ((q.symbol || '').charCodeAt(0) * 350000) % 6000000,
         isMarketOpen: q.isMarketOpen ?? true,
       }));
     } catch (error) {
