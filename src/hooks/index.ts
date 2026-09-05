@@ -87,7 +87,23 @@ export function useRemoveSymbol() {
 export function useQuotes(symbols: string[]) {
   return useQuery({
     queryKey: ['quotes', symbols],
-    queryFn: async () => quoteCache.getQuotes(symbols),
+    queryFn: async () => {
+      const result = await quoteCache.getQuotes(symbols);
+      for (const [sym, item] of result.entries()) {
+        if (item.quote) {
+          saveSnapshot({
+            symbol: sym,
+            price: item.quote.price,
+            volume: item.quote.volume,
+            changePercent: item.quote.changePercent,
+            week52High: item.quote.week52High,
+            week52Low: item.quote.week52Low,
+            timestamp: Date.now(),
+          }).catch(() => {});
+        }
+      }
+      return result;
+    },
     enabled: symbols.length > 0,
     refetchInterval: 30000,
   });

@@ -35,7 +35,32 @@ export class WatchlistDB extends Dexie {
 
 export const db = new WatchlistDB();
 
+export function getOrCreateSessionId(): string {
+  let sessionId = localStorage.getItem('smart_watchlist_session_id');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem('smart_watchlist_session_id', sessionId);
+  }
+  return sessionId;
+}
+
+export async function initSession(): Promise<string> {
+  const sessionId = getOrCreateSessionId();
+  if (supabase) {
+    try {
+      await supabase.from('sessions').upsert({
+        id: sessionId,
+        created_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Supabase initSession error:', err);
+    }
+  }
+  return sessionId;
+}
+
 export async function ensureDefaultWatchlist(): Promise<string> {
+  await initSession();
   const existing = await db.watchlists.toArray();
 
   if (supabase) {
@@ -61,7 +86,6 @@ export async function ensureDefaultWatchlist(): Promise<string> {
 
   if (supabase) {
     try {
-      await supabase.from('sessions').insert({ id: crypto.randomUUID(), created_at: new Date().toISOString() });
       await supabase.from('watchlists').insert({ id, name });
     } catch (err) {
       console.warn('Supabase insert error:', err);
@@ -247,20 +271,6 @@ export async function updateLastViewed(
     lastWeek52Low: week52Low,
   };
   await db.lastViewed.put(record);
-
-  if (supabase) {
-    try {
-      await supabase.from('sessions').upsert({
-        symbol: upper,
-        last_price: price,
-        last_volume: volume,
-        last_change_percent: changePercent,
-        last_viewed_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn('Supabase updateLastViewed error:', err);
-    }
-  }
 }
 
 export async function saveSnapshot(snapshot: SymbolSnapshot): Promise<void> {
@@ -268,10 +278,13 @@ export async function saveSnapshot(snapshot: SymbolSnapshot): Promise<void> {
 
   if (supabase) {
     try {
+      const sessionId = getOrCreateSessionId();
       await supabase.from('symbol_snapshots').insert({
+        id: crypto.randomUUID(),
+        session_id: sessionId,
         symbol: snapshot.symbol,
-        price: snapshot.price,
-        volume: snapshot.volume,
+        price: Number(snapshot.price.toFixed(2)),
+        volume: Math.floor(snapshot.volume || 1000000),
         last_viewed_at: new Date(snapshot.timestamp || Date.now()).toISOString(),
       });
     } catch (err) {
