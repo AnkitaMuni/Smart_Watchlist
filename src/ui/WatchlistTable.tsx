@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { X, TrendingUp, TrendingDown, Minus, Wifi, WifiOff, AlertCircle, Clock } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Minus, Wifi, WifiOff, AlertCircle, Clock, Zap, Flame, Award, AlignJustify, List } from 'lucide-react';
 import { useWatchlistEntries, useQuotes, useRemoveSymbol } from '../hooks';
 import type { QuoteWithState, DataState } from '../types';
 
@@ -8,9 +8,6 @@ interface WatchlistTableProps {
   onSelectSymbol: (symbol: string) => void;
 }
 
-const ROW_HEIGHT = 56;
-const BUFFER = 5;
-
 export function WatchlistTable({ watchlistId, onSelectSymbol }: WatchlistTableProps) {
   const { data: entries } = useWatchlistEntries(watchlistId);
   const symbols = useMemo(() => (entries ?? []).map((e) => e.symbol), [entries]);
@@ -18,7 +15,11 @@ export function WatchlistTable({ watchlistId, onSelectSymbol }: WatchlistTablePr
   const removeSymbol = useRemoveSymbol();
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(600);
+  const [density, setDensity] = useState<'standard' | 'compact'>('standard');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const rowHeight = density === 'compact' ? 40 : 56;
+  const buffer = 5;
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
@@ -30,7 +31,6 @@ export function WatchlistTable({ watchlistId, onSelectSymbol }: WatchlistTablePr
     }
   }, []);
 
-  // Observe container resize
   useMemo(() => {
     if (containerRef.current) {
       const observer = new ResizeObserver(handleResize);
@@ -74,51 +74,75 @@ export function WatchlistTable({ watchlistId, onSelectSymbol }: WatchlistTablePr
   }
 
   const sortedSymbols = [...symbols].sort();
-  const totalHeight = sortedSymbols.length * ROW_HEIGHT;
-  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  const totalHeight = sortedSymbols.length * rowHeight;
+  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);
   const endIndex = Math.min(
     sortedSymbols.length,
-    Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + BUFFER,
+    Math.ceil((scrollTop + containerHeight) / rowHeight) + buffer
   );
   const visibleSymbols = sortedSymbols.slice(startIndex, endIndex);
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="card overflow-auto"
-      style={{ maxHeight: '70vh' }}
-    >
-      {/* Header row */}
-      <div
-        className="sticky top-0 z-10 grid grid-cols-[80px_1fr_100px_100px_120px_40px] gap-2 border-b border-[#1e2a44] bg-[#111729] px-4 py-2.5 text-xs font-medium text-[#5a6478]"
-      style={{ height: ROW_HEIGHT - 8 }}
-      >
-        <div>Symbol</div>
-        <div>Price</div>
-        <div className="text-right">Change %</div>
-        <div className="text-right">Volume</div>
-        <div className="text-right">Status</div>
-        <div></div>
+    <div className="space-y-2">
+      {/* Density Switcher Controls */}
+      <div className="flex items-center justify-between px-1 text-xs text-[#5a6478]">
+        <span>Showing {sortedSymbols.length} tracked stocks</span>
+        <div className="flex items-center gap-1 bg-[#111729] p-1 rounded-lg border border-[#1e2a44]">
+          <button
+            onClick={() => setDensity('standard')}
+            className={`flex items-center gap-1 rounded px-2 py-0.5 transition-colors ${
+              density === 'standard' ? 'bg-primary-500/20 text-primary-400 font-bold' : 'text-[#5a6478]'
+            }`}
+          >
+            <List size={12} /> Standard
+          </button>
+          <button
+            onClick={() => setDensity('compact')}
+            className={`flex items-center gap-1 rounded px-2 py-0.5 transition-colors ${
+              density === 'compact' ? 'bg-primary-500/20 text-primary-400 font-bold' : 'text-[#5a6478]'
+            }`}
+          >
+            <AlignJustify size={12} /> Compact
+          </button>
+        </div>
       </div>
 
-      {/* Virtualized rows */}
-      <div style={{ height: totalHeight, position: 'relative' }}>
-        <div style={{ transform: `translateY(${startIndex * ROW_HEIGHT}px)` }}>
-          {visibleSymbols.map((symbol, i) => {
-            const idx = startIndex + i;
-            const data = quotesMap?.get(symbol);
-            return (
-              <WatchlistRow
-                key={symbol}
-                symbol={symbol}
-                data={data}
-                watchlistId={watchlistId}
-                onRemove={() => removeSymbol.mutate({ watchlistId, symbol })}
-                onSelect={() => onSelectSymbol(symbol)}
-              />
-            );
-          })}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="card overflow-auto"
+        style={{ maxHeight: '70vh' }}
+      >
+        {/* Header row */}
+        <div
+          className="sticky top-0 z-10 grid grid-cols-[80px_1fr_120px_100px_130px_40px] gap-2 border-b border-[#1e2a44] bg-[#111729] px-4 py-2 text-xs font-medium text-[#5a6478]"
+          style={{ height: rowHeight - 8 }}
+        >
+          <div>Symbol</div>
+          <div>Price</div>
+          <div className="text-right">Change %</div>
+          <div className="text-right">Volume</div>
+          <div className="text-right">Status & Catalysts</div>
+          <div></div>
+        </div>
+
+        {/* Virtualized rows */}
+        <div style={{ height: totalHeight, position: 'relative' }}>
+          <div style={{ transform: `translateY(${startIndex * rowHeight}px)` }}>
+            {visibleSymbols.map((symbol) => {
+              const data = quotesMap?.get(symbol);
+              return (
+                <WatchlistRow
+                  key={symbol}
+                  symbol={symbol}
+                  data={data}
+                  rowHeight={rowHeight}
+                  onRemove={() => removeSymbol.mutate({ watchlistId, symbol })}
+                  onSelect={() => onSelectSymbol(symbol)}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -128,13 +152,13 @@ export function WatchlistTable({ watchlistId, onSelectSymbol }: WatchlistTablePr
 function WatchlistRow({
   symbol,
   data,
-  watchlistId,
+  rowHeight,
   onRemove,
   onSelect,
 }: {
   symbol: string;
   data: QuoteWithState | undefined;
-  watchlistId: string;
+  rowHeight: number;
   onRemove: () => void;
   onSelect: () => void;
 }) {
@@ -142,11 +166,15 @@ function WatchlistRow({
   const state: DataState = data?.state ?? 'unavailable';
   const isUp = quote ? quote.changePercent >= 0 : true;
 
+  const isNearHigh = quote && quote.high >= (quote.week52High ?? quote.high) * 0.98;
+  const isVolSurge = quote && quote.volume > 2000000;
+  const isHighVol = quote && Math.abs(quote.changePercent) >= 3;
+
   return (
     <div
       onClick={onSelect}
-      className="group grid cursor-pointer grid-cols-[80px_1fr_100px_100px_120px_40px] items-center gap-2 border-b border-[#1a2236] px-4 transition-colors hover:bg-[#1a2236]"
-      style={{ height: ROW_HEIGHT }}
+      className="group grid cursor-pointer grid-cols-[80px_1fr_120px_100px_130px_40px] items-center gap-2 border-b border-[#1a2236] px-4 transition-colors hover:bg-[#1a2236]"
+      style={{ height: rowHeight }}
     >
       <div className="font-mono text-sm font-semibold text-[#e4e9f2]">{symbol}</div>
 
@@ -160,11 +188,13 @@ function WatchlistRow({
         )}
       </div>
 
-      <div className="text-right">
+      <div className="text-right flex items-center justify-end gap-1.5">
         {quote ? (
-          <span className={`font-mono text-sm font-medium ${isUp ? 'price-up' : 'price-down'}`}>
-            {isUp ? '+' : ''}{quote.changePercent.toFixed(2)}%
-          </span>
+          <>
+            <span className={`font-mono text-sm font-medium ${isUp ? 'price-up' : 'price-down'}`}>
+              {isUp ? '+' : ''}{quote.changePercent.toFixed(2)}%
+            </span>
+          </>
         ) : (
           <span className="text-sm text-[#5a6478]">—</span>
         )}
@@ -180,7 +210,22 @@ function WatchlistRow({
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-1">
+        {isNearHigh && (
+          <span className="badge bg-amber-500/10 text-amber-400 p-1" title="Near 52W High">
+            <Award size={10} />
+          </span>
+        )}
+        {isVolSurge && (
+          <span className="badge bg-indigo-500/10 text-indigo-400 p-1" title="Volume Surge">
+            <Zap size={10} />
+          </span>
+        )}
+        {isHighVol && (
+          <span className="badge bg-rose-500/10 text-rose-400 p-1" title="High Volatility">
+            <Flame size={10} />
+          </span>
+        )}
         <StateBadge state={state} message={data?.stateMessage ?? ''} />
       </div>
 

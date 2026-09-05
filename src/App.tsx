@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Eye, Activity, Cpu, LayoutGrid, Table } from 'lucide-react';
+import { Eye, Activity, Cpu, LayoutGrid, Table, Bell, Columns } from 'lucide-react';
 import { WatchlistSelector } from './ui/WatchlistSelector';
 import { AddSymbol } from './ui/AddSymbol';
 import { MarketPulse } from './ui/MarketPulse';
+import { ExecutiveSummary } from './ui/ExecutiveSummary';
 import { WhatChanged } from './ui/WhatChanged';
 import { WatchlistTable } from './ui/WatchlistTable';
 import { VolatilityHeatmap } from './ui/VolatilityHeatmap';
 import { SymbolDetail } from './ui/SymbolDetail';
 import { ArchitectureModal } from './ui/ArchitectureModal';
+import { PriceAlertsModal } from './ui/PriceAlertsModal';
+import { WatchlistCompareModal } from './ui/WatchlistCompareModal';
 import { useWatchlists } from './hooks';
 
 export default function App() {
@@ -15,6 +18,8 @@ export default function App() {
   const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [showArchModal, setShowArchModal] = useState(false);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'heatmap'>('table');
 
   useEffect(() => {
@@ -28,7 +33,7 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-[#1e2a44] bg-[#0a0e1a]/95 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10">
                 <Eye size={20} className="text-primary-400" />
@@ -39,7 +44,25 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {/* Compare Watchlists Button */}
+              <button
+                onClick={() => setShowCompareModal(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[#1e2a44] bg-[#111729] px-3 py-1.5 text-xs font-medium text-[#8b95a8] transition-colors hover:border-accent-500/40 hover:text-accent-300"
+              >
+                <Columns size={14} />
+                <span>Compare Lists</span>
+              </button>
+
+              {/* Price Alerts Modal Button */}
+              <button
+                onClick={() => setShowAlertsModal(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[#1e2a44] bg-[#111729] px-3 py-1.5 text-xs font-medium text-[#8b95a8] transition-colors hover:border-amber-500/40 hover:text-amber-300"
+              >
+                <Bell size={14} />
+                <span>Price Alerts</span>
+              </button>
+
               {/* Architecture & Telemetry Modal Trigger */}
               <button
                 onClick={() => setShowArchModal(true)}
@@ -65,6 +88,9 @@ export default function App() {
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6">
         {/* Watchlist selector & export/import */}
         <WatchlistSelector activeId={activeWatchlistId} onSelect={setActiveWatchlistId} />
+
+        {/* AI Executive Market Summary Narrative */}
+        {activeWatchlistId && <ExecutiveSummary watchlistId={activeWatchlistId} />}
 
         {/* What changed panel */}
         {activeWatchlistId && (
@@ -124,6 +150,17 @@ export default function App() {
 
       {/* Architecture & Telemetry modal */}
       {showArchModal && <ArchitectureModal onClose={() => setShowArchModal(false)} />}
+
+      {/* Price Alerts modal */}
+      {showAlertsModal && <PriceAlertsModal onClose={() => setShowAlertsModal(false)} />}
+
+      {/* Watchlist Compare modal */}
+      {showCompareModal && (
+        <WatchlistCompareModal
+          currentWatchlistId={activeWatchlistId}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
 
       {/* Footer */}
       <footer className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
